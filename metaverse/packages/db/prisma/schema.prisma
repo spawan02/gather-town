@@ -78,7 +78,7 @@ model Avatar {
   imageUrl String?
   name     String?
   user     User[]
-}
+} 
 
 enum Role {
   Admin

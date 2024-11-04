@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken"
 import { JWT_PASSWORD } from "../config"
 
 export const adminMiddleware = (req:Request,res:Response,next:NextFunction) =>{
-    const {authorization } = req.headers
+    const {authorization} = req.headers
     const header = authorization?.split(" ")[1]
     if(!header){
         res.status(400).json({
@@ -17,11 +17,12 @@ export const adminMiddleware = (req:Request,res:Response,next:NextFunction) =>{
             res.status(403).json({
                 message: "Invalid authorisation"
             })
+            return
         }
         req.userId = decoded.userId
         next()
     }catch(e){
-        res.status(403).json({
+        res.status(401).json({
             message: "Internal server error"
         })
         return

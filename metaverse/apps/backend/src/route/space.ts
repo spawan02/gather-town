@@ -49,17 +49,20 @@ router.post('/',userMiddleware,async(req,res)=>{
                 creatorId: req.userId!
             }
         })
+       
+        const spaceElement = map.mapElements.map(e=>({
+            spaceId: space.id,
+            elementId: e.elementId,
+            x: e.x!,
+            y: e.y!
+        }))
+    
         await client.spaceElements.createMany({
-            data: map.mapElements.map(x=>({
-                    spaceId: x.id,
-                    elementId: x.elementId,
-                    x: x.x!,
-                    y: x.y!
-                }))
+            data: spaceElement
         })
         return space
     })
-    res.json({})
+    res.status(200).json({spaceId:space.id})
 })
 
 router.post('/element',userMiddleware,async(req,res)=>{
@@ -156,7 +159,6 @@ router.get('/:spaceId',async(req,res)=>{
         })),
     })
 })
-
 
 router.delete('/:spaceId',userMiddleware,async(req,res)=>{
     const {spaceId} = req.params

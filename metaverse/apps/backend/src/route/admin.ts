@@ -4,8 +4,8 @@ import { adminMiddleware } from "../middlewares/admin"
 import client from "@repo/db/client"
 
 const router  = express.Router()
-router.use(adminMiddleware)
-router.post("/element",async(req,res)=>{
+// router.use(adminMiddleware)
+router.post("/element",adminMiddleware,async(req,res)=>{
     const { imageUrl, width, height } = req.body
     const validataion = adminCreateElement.safeParse(req.body)
     if(!validataion.success){
@@ -28,7 +28,7 @@ router.post("/element",async(req,res)=>{
 
 })
 
-router.put('/element/:elementId',async(req,res)=>{
+router.put('/element/:elementId',adminMiddleware,async(req,res)=>{
     const {elementId} = req.params;
     const validation = createElement.safeParse(req.body)
     if(!validation.success){
@@ -50,7 +50,7 @@ router.put('/element/:elementId',async(req,res)=>{
     })
 })
 
-router.post('/avatar',async(req,res)=>{
+router.post('/avatar',adminMiddleware,async(req,res)=>{
     const validation = createAvatar.safeParse(req.body)
     if(!validation.success){
         res.status(400).json({
@@ -70,7 +70,7 @@ router.post('/avatar',async(req,res)=>{
 
 })
 
-router.post("/map",async(req,res)=>{
+router.post("/map",adminMiddleware,async(req,res)=>{
     const validataion = createMap.safeParse(req.body)
     if(!validataion.success){
         res.status(400).json({

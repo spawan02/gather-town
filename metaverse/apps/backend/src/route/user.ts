@@ -11,7 +11,7 @@ router.post('/metadata',userMiddleware,async (req,res)=>{
             message: "validation failed"
         })
     }
-
+    
     try {
         await client.user.update({
             where: {
