@@ -13,6 +13,9 @@ wss.on('connection',(ws)=>{
     ws.on('message',(message)=>{
         handleMessage(message,ws)
     })
+    ws.on('close',()=>{
+        
+    })
 })
 
 const handleMessage=(message:any,ws:WebSocket)=>{

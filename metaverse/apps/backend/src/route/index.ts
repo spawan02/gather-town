@@ -11,8 +11,7 @@ import { JWT_PASSWORD } from "../config"
 
 const router = express.Router()
 
-router.post('signup', async(req,res)=>{
-
+router.post('/signup', async(req,res)=>{
     const validation = signUpSchema.safeParse(req.body)
     if(!validation.success){
         res.status(400).json({
@@ -20,9 +19,14 @@ router.post('signup', async(req,res)=>{
         })
         return
     }
-    const hashedPassword = await hashPassword(validation.data.password)
     
-    try{
+    const hashedPassword = await hashPassword(validation.data.password)
+
+    if(!hashedPassword) {
+        res.status(400).json({message: "internal server error"})
+        return
+    }
+    try{ 
         const user = await client.user.create({
             data:{
                 username: validation.data.username,
@@ -34,16 +38,13 @@ router.post('signup', async(req,res)=>{
             userId: user.id
         })
     }catch(e){
-        console.log(e)
         res.status(400).json({
             message: "user already exists"
         })
     }
    
-
-
 })
-router.post('signin', async(req,res)=>{
+router.post('/signin', async(req,res)=>{
     
     const validation = signInSchema.safeParse(req.body)
     if(!validation.success){
@@ -78,7 +79,7 @@ router.post('signin', async(req,res)=>{
         res.status(200).json({token})
 
     }catch(e){
-        res.status(400).json({
+        res.status(400).json({  
             message: "Internal Error"
         })
     }

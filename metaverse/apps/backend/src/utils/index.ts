@@ -1,12 +1,13 @@
 import bcrypt from "bcrypt"
-import { randomBytes } from "crypto"
-
  
 export const hashPassword = async (password:string) => {
-    const salt = randomBytes(16).toString('hex')
-    const hashValue = await bcrypt.hash(password,salt)
-    return hashValue
-
+   try{
+       const salt = await bcrypt.genSalt(10);
+       const hashValue = await bcrypt.hash(password,salt)
+       return hashValue
+    }catch(error){
+        throw new Error("Error generating the bcrypt")
+    }
 }
 
 export const comparePassword = async(password:string, hashedPassword:string)=>{
