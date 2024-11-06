@@ -15,6 +15,7 @@ export const userMiddleware = (req:Request,res:Response,next:NextFunction)=>{
         const decoded = jwt.verify(token, JWT_PASSWORD) as {role:string, userId: string}
         req.userId = decoded.userId   
         next()
+
     }catch{
         res.status(400).json({
             message: "Invalid access"

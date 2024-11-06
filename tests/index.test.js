@@ -782,7 +782,6 @@ describe("Websocket tests", () => {
             username,
             password
         })
-
         adminUserId = adminSignupResponse.data.userId;
         adminToken = adminSigninResponse.data.token;
         
@@ -890,7 +889,6 @@ describe("Websocket tests", () => {
             }
         }))
         const message1 = await waitForAndPopLatestMessage(ws1Messages);
-        console.log("message1 from ws", message1.payload)
         ws2.send(JSON.stringify({
             "type": "join",
             "payload": {
@@ -900,10 +898,8 @@ describe("Websocket tests", () => {
         }))
 
         const message2 = await waitForAndPopLatestMessage(ws2Messages);
-        console.log("this is message2", message2)
         const message3 = await waitForAndPopLatestMessage(ws1Messages);
         
-        console.log("this is message3",message3);
         expect(message1.type).toBe("space-joined")
         expect(message1.payload.users.length).toBe(0)
         expect(message2.type).toBe("space-joined")
@@ -945,6 +941,7 @@ describe("Websocket tests", () => {
             }
         }));
 
+
         const message = await waitForAndPopLatestMessage(ws1Messages);
         expect(message.type).toBe("movement-rejected")
         expect(message.payload.x).toBe(adminX)
@@ -960,7 +957,6 @@ describe("Websocket tests", () => {
                 userId: adminId
             }
         }));
-
         const message = await waitForAndPopLatestMessage(ws2Messages);
         expect(message.type).toBe("movement")
         expect(message.payload.x).toBe(adminX + 1)

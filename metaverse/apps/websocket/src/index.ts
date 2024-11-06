@@ -1,146 +1,180 @@
 import { WebSocketServer, WebSocket } from "ws";
-import express from "express"
 import jwt, { JwtPayload } from "jsonwebtoken"
 import { JWT_PASSWORD } from "./config";
 import client from "@repo/db/client"
 
-const app = express()
-const httpServer = app.listen(8080)
+const wss = new WebSocketServer({port: 8080})
+let userRoom: Map<string, myWS[]> = new Map();
 
-const wss = new WebSocketServer({server: httpServer})
-let userRoom: Map<string, string[]> = new Map();
-let userWsMap: Map<string, WebSocket> = new Map();
-let userPositionMap: Map<string, { x: number, y: number }> = new Map(); 
+interface myWS extends WebSocket{
+    x: number, 
+    y: number, 
+    userId: string, 
+    spaceId: string
+}
 
-wss.on('connection',(ws)=>{
+async function decode(payload:any):Promise<any>{
+    const token = payload.token
+    const decoded = jwt.verify(token,JWT_PASSWORD)
+    return decoded;
+}
+
+
+async function handleJoin (payload:any, ws: myWS){
+    const spaceId = payload.spaceId
+    const decoded = await decode(payload)
+    const userId = decoded.userId
+    if(!userId || typeof userId !== 'string'){
+        throw new Error("Invalid token")
+    }
+    if(!userRoom.get(spaceId)){
+        userRoom.set(spaceId,[])
+    }
+    const spaceUser = userRoom.get(spaceId)
+    ws.userId = userId
+    ws.spaceId = spaceId
+    
+    const space = await client.space.findFirst({
+        where:{
+            id: spaceId
+        }
+
+    })
+    if(!space){
+        throw new Error("SpaceId not found")
+    }
+    const exists = spaceUser?.some(ws=>ws.userId===userId)
+    const x = (Math.floor(Math.random() * space!.width))
+    const y = (Math.floor(Math.random() * space.height))
+   
+    ws.x = x
+    ws.y = y
+    if(spaceUser && !exists){
+        spaceUser.push(ws)
+    }
+    const spaceJoined = {
+        "type": "space-joined", 
+        "payload": {
+            "spawn": {
+                "x": x,
+                "y": y
+            },
+            users: userRoom.get(spaceId)?.filter(x=>x.userId!==userId).map(u=> ({id: userId})) ?? []
+        }
+    }   
+    ws.send(JSON.stringify(spaceJoined))
+    
+    const BroadcastChannel = {
+        "type": "user-joined",
+        "payload": {
+            "userId": userId,
+            "x": x,
+            "y": y
+        }
+    }
+    const allUsers = userRoom.get(spaceId)
+    allUsers?.forEach(x=>{
+        if(x.userId!==userId){
+            x.send(JSON.stringify(BroadcastChannel))
+        }
+    })
+}
+async function handleMove(payload:any, ws:myWS){
+    const{x:moveX,y:moveY} = payload
+    const xChange = Math.abs(ws.x-moveX)
+    const yChange = Math.abs(ws.y-moveY)
+    const spaceId = ws.spaceId;
+    const space = await client.space.findFirst({
+        where:{
+            id: spaceId
+        },select:{
+            width:true,
+            height:true
+        }
+    }) 
+    if(!space){
+        throw new Error("Invalid space")
+    }
+    if( xChange == 1 && yChange == 0 || xChange == 0 && yChange == 1 ){
+        const message ={
+            type:"movement",
+            payload:{
+                "x":moveX,
+                "y":moveY
+            }
+        }
+        userRoom.get(spaceId)?.forEach(x=>{
+            x.send(JSON.stringify(message))
+        })
+    }
+
+    const message = {
+        type: "movement-rejected",
+        payload:{
+            x: ws.x,
+            y: ws.y
+        }
+    }
+    ws.send(JSON.stringify(message))
+}
+
+function handleLeave(ws:myWS){
+    const response = {
+        type: "user-left",
+        payload:{
+            userId: ws.userId
+        }
+    }
+    const user = userRoom.get(ws.spaceId)?.forEach(x=>{
+        if(x.userId===ws.userId){
+            const a = userRoom.get(x.spaceId)?.filter(x=>x.userId!==ws.userId)
+            
+            if(a!.length>0){
+                userRoom.set(ws.spaceId,a!)
+            }else{
+                userRoom.delete(ws.spaceId)
+            }
+            userRoom.delete(x.userId)
+        }
+    })
+    userRoom.get(ws.spaceId)?.forEach(x=>{
+        x.send(JSON.stringify(response))
+    })
+
+}   
+wss.on('connection',(ws:myWS)=>{
     ws.on('open',()=>{
         console.log("Server connected")
     })
-    ws.on('message',(message)=>{
-        handleMessage(message,ws)
+    ws.on('message',async(message)=>{
+        const parsedData = JSON.parse(message.toString())
+        if(!parsedData.type){
+            const responseData = {
+                type: "error",
+                message: "type is required"
+            }
+            ws.send(JSON.stringify(responseData))
+        }
+        switch(parsedData.type){
+            case "join": {
+                await handleJoin(parsedData.payload,ws)
+            }
+            break;
+            case "move":{
+                handleMove(parsedData.payload,ws)
+            }
+            break;
+            default:
+                const response = JSON.stringify({
+                    type: "error",
+                    message: "Type invalid"
+                })
+                ws.send(response)
+        }
+        
     })
     ws.on('close',()=>{
+        handleLeave(ws)
         console.log("Server disconnected")
     })
 })
-
-const handleMessage = async(message:any,ws:WebSocket)=>{
-    const parsedData = JSON.parse(message.toString())
-    const spaceId = parsedData.payload.spaceId;
-        const token = parsedData.payload.token;
-        let x,y;
-        let userId:string;
-        let space;
-        switch(parsedData.type){
-            case "join":{
-            userId = (jwt.verify(token,JWT_PASSWORD)as JwtPayload).userId
-            if(!userId){
-                ws.close()
-                return
-            }
-            space = await client.space.findFirst({
-                where:{
-                    id: spaceId
-                }
-            })
-            if(!space){
-                ws.close()
-                return
-            }
-            if(!userRoom.has(spaceId)){
-                userRoom.set(spaceId, [userId]) 
-            }else{
-                userRoom.get(spaceId)?.push(userId); 
-            }
-            userWsMap.set(userId, ws);
-
-            x = (Math.floor(Math.random() * space.width))
-            y = (Math.floor(Math.random() * space.height))
-            userPositionMap.set(userId, { x, y });
-            const spaceJoined = {
-                "type": "space-joined", 
-                "payload": {
-                    "spawn": {
-                        "x": x,
-                        "y": y
-                    },
-                    users: userRoom.get(spaceId)?.filter(x=>x!==userId).map(u=> ({id: userId})) ?? []
-                }
-            }   
-            ws.send(JSON.stringify(spaceJoined))
-            const BroadcastChannel = {
-                "type": "user-joined",
-                "payload": {
-                    "userId": userId,
-                    "x": x,
-                    "y": y
-                }
-            }
-            if(!userRoom.get(spaceId)){
-                return;
-            }
-            const roomUsers = userRoom.get(spaceId);
-            if (roomUsers) {
-                roomUsers.forEach(u => {
-                    // Don't send to the user who just joined
-                    if (u !== userId) {
-                        const otherWs = userWsMap.get(u);
-                        if (otherWs) {
-                            otherWs.send(JSON.stringify(BroadcastChannel));
-                        }
-                    }
-                });
-            }
-
-        }
-        break;
-        case "move":
-            const currentX = 'adminX';  
-            const currentY = 'adminY';  
-            console.log("space width", space)
-            console.log("x", x)
-            let moveX = parsedData.payload.x;
-            let moveY = parsedData.payload.y;
-            if(moveX<0) moveX=0;
-            if(moveX>space!.width) moveX = space!.width 
-            if(moveY<0) moveY=0;
-            if(moveY>space!.width) moveY = space!.height 
-            const xDisplacement = Math.abs(x! - moveX);
-            const yDisplacement = Math.abs(y! - moveY);
-            if(moveX!==parsedData.payload.x || moveY!== parsedData.payload.y){
-                ws.send(JSON.stringify({
-                    type: "movement-rejected",
-                    payload: {
-                        x: currentX,
-                        y: currentY
-                    }
-                }));            
-               
-            }
-            if ((xDisplacement == 1 && yDisplacement== 0) || (xDisplacement == 0 && yDisplacement == 1)) {
-                x = moveX;
-                y = moveY;
-                const BroadcastChannel ={
-                    type: "movement",
-                    payload: {
-                        x: x,
-                        y: y
-                    }
-                }
-                const roomUsers = userRoom.get(spaceId);
-                if (roomUsers) {
-                    roomUsers.forEach(u => {
-                        // Don't send to the user who just joined
-                        if (u !== userId) {
-                            const otherWs = userWsMap.get(u);
-                            if (otherWs) {
-                                otherWs.send(JSON.stringify(BroadcastChannel));
-                            }
-                        }
-                    });
-                }
-            }
-            break;
-           
-    }
-}
