@@ -28,10 +28,8 @@ router.post('/',userMiddleware,async(req,res)=>{
     const map = await client.map.findFirst({
         where:{
             id: validation.data.mapId
-        },select:{
+        },include:{
             mapElements: true, 
-            width: true,
-            height: true
         }
     })
     if(!map){
@@ -56,7 +54,11 @@ router.post('/',userMiddleware,async(req,res)=>{
             x: e.x!,
             y: e.y!
         }))
-    
+        const spaceIds = spaceElement.map(e => e.spaceId);
+        
+        const existingSpaces = await client.space.findMany({
+            where: { id: { in: spaceIds } },
+        });
         await client.spaceElements.createMany({
             data: spaceElement
         })
@@ -94,18 +96,32 @@ router.post('/element',userMiddleware,async(req,res)=>{
         res.status(400).json({
             message: "Point is outside the space"
         })
+        return
     }
-    await client.spaceElements.create({
-        data:{
-            elementId,
-            spaceId,
-            x,
-            y,
+    const elementResponse = await client.element.findFirst({
+        where: {
+            id: elementId
         }
     })
-    res.status(200).json({
-        message: "element added"
-    })
+    if(!elementResponse){
+        res.status(400).json({
+            message: "Element not found"
+        })
+    }
+    else{
+        await client.spaceElements.create({
+            data:{
+                elementId,
+                spaceId,
+                x,
+                y,
+            }
+        })
+        res.status(200).json({
+            message: "element added"
+        })
+        return
+    }
 })
 
 router.get("/all",async(req,res)=>{
@@ -144,7 +160,7 @@ router.get('/:spaceId',async(req,res)=>{
         return
     }
     res.status(200).json({
-        dimension: `${space.width}x${space.height}`,
+        dimensions: `${space.width}x${space.height}`,
         elements: space.elements.map(x=>({
             id: x.id,
             element:{
@@ -208,6 +224,7 @@ router.delete("/element",userMiddleware,async(req,res)=>{
             space:true
         }
     })
+    
     if(!element?.space.creatorId||element?.space.creatorId !== req.userId){
         res.status(400).json({
             message: "Unauthorised"

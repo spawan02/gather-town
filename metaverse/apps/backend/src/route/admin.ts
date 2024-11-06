@@ -92,6 +92,7 @@ router.post("/map",adminMiddleware,async(req,res)=>{
                 }))
         }}
     })
+   
     res.status(200).json({
         id: map.id
     })
