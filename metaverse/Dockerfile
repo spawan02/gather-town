@@ -1,0 +1,25 @@
+FROM node:20-alpine
+
+
+ARG DATABASE_URL
+
+
+WORKDIR /usr/src/app
+
+
+COPY . .
+
+
+RUN npm install
+
+
+RUN cd packages/db && DATABASE_URL=$DATABASE_URL npx prisma generate && cd ../..
+
+
+RUN npm run build
+
+
+EXPOSE 3000 8080
+
+
+CMD ["npm", "run", "start"]

@@ -210,6 +210,15 @@ describe('User avatar Information', () =>{
         expect(avatarResponse.data.avatarId).toBeDefined()
 
     })
+    
+    test("Get back avatar information for a user", async () => {
+        console.log("asking for user with id " + userId)
+        const response = await axios.get(`${BACKEND_URL}/api/v1/user/metadata/bulk?ids=[${userId}]`);
+        console.log("response was " + userId)
+        console.log(JSON.stringify(response.data))
+        expect(response.data.avatars.length).toBe(1);
+        expect(response.data.avatars[0].userId).toBe(userId);
+    })
 
     test('Get available avatars',async ()=>{
         const response = await axios.get(`${HTTP_SERVER_URL}/api/v1/avatars`)
