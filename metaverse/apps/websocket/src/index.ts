@@ -2,6 +2,8 @@ import { WebSocketServer, WebSocket } from "ws";
 import jwt, { JwtPayload } from "jsonwebtoken"
 import { JWT_PASSWORD } from "./config";
 import client from "@repo/db/client"
+import dotenv from "dotenv"
+dotenv.config()
 
 const wss = new WebSocketServer({port: 8080})
 let userRoom: Map<string, myWS[]> = new Map();
@@ -81,8 +83,10 @@ async function handleJoin (payload:any, ws: myWS){
 }
 async function handleMove(payload:any, ws:myWS){
     const{x:moveX,y:moveY} = payload
-    const xChange = Math.abs(ws.x-moveX)
-    const yChange = Math.abs(ws.y-moveY)
+    const dataX= moveX + ws.x
+    const dataY= moveX + ws.y
+    const xChange = Math.abs(dataX - ws.x)
+    const yChange = Math.abs(dataY - ws.y)
     const spaceId = ws.spaceId;
     const space = await client.space.findFirst({
         where:{
@@ -95,7 +99,29 @@ async function handleMove(payload:any, ws:myWS){
     if(!space){
         throw new Error("Invalid space")
     }
+    if (dataX > space.width || dataY > space.height) {
+        return ws.send(JSON.stringify({
+            type: "movement-rejected",
+            payload:{
+                x: ws.x,
+                y: ws.y
+        }
+        }))
+    }   
+    const exist = userRoom.get(ws.spaceId)
+    const spawn_exists = exist!.some(ws => ws.x === dataX && ws.y === dataY);
+    if(spawn_exists){
+        return ws.send(JSON.stringify({
+            type: "movement-rejected",
+            payload:{
+                x: ws.x,
+                y: ws.y
+        }
+        }))
+    }
     if( xChange == 1 && yChange == 0 || xChange == 0 && yChange == 1 ){
+        ws.x = xChange
+        ws.y = yChange
         const message ={
             type:"movement",
             payload:{
@@ -103,11 +129,11 @@ async function handleMove(payload:any, ws:myWS){
                 "y":moveY
             }
         }
-        userRoom.get(spaceId)?.forEach(x=>{
+        userRoom.get(ws.spaceId)?.forEach(x=>{
             x.send(JSON.stringify(message))
         })
     }
-
+    
     const message = {
         type: "movement-rejected",
         payload:{

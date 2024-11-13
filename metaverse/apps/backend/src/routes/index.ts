@@ -11,6 +11,12 @@ import { JWT_PASSWORD } from "../config"
 
 const router = express.Router()
 
+router.get("/",(_,res)=>{
+    res.json({
+        message: "server is healthy"
+    })
+})
+
 router.post('/signup', async(req,res)=>{
     const validation = signUpSchema.safeParse(req.body)
     if(!validation.success){
